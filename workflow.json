@@ -1,0 +1,568 @@
+{
+  "name": "Hairdresser Booking System",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-1111-1111-1111-111111111111",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "hairdresser-booking",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Business Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract phone number and message text\nconst phoneNumber = $input.item.json.body.from || $input.item.json.body.contact?.phone;\nconst contactName = $input.item.json.body.contact?.name || 'Customer';\nconst messageText = $input.item.json.body.message?.text || '';\nconst messageId = $input.item.json.body.id;\n\n// Get current date and time\nconst now = new Date();\nconst today = now.toISOString().split('T')[0]; // YYYY-MM-DD format\n\nreturn {\n  json: {\n    phoneNumber: phoneNumber,\n    contactName: contactName,\n    messageText: messageText.trim(),\n    messageId: messageId,\n    today: today,\n    currentHour: now.getHours()\n  }\n};"
+      },
+      "id": "a1b2c3d4-1001-1001-1001-100110011001",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO users (phone_number, name, created_at)\nVALUES ('{{ $json.phoneNumber }}', '{{ $json.contactName }}', NOW())\nON CONFLICT (phone_number) \nDO UPDATE SET last_contact = NOW()\nRETURNING id, phone_number, name;",
+        "options": {}
+      },
+      "id": "a1b2c3d4-1002-1002-1002-100210021002",
+      "name": "Upsert User",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "PostgreSQL Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.messageText }}",
+              "operation": "equals",
+              "value2": "/randevu"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-2222-2222-2222-222222222222",
+      "name": "Check if /randevu",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT appointment_time, duration_minutes\nFROM appointments\nWHERE appointment_date = '{{ $json.today }}'\nAND status IN ('confirmed', 'pending')\nORDER BY appointment_time;",
+        "options": {}
+      },
+      "id": "a1b2c3d4-5555-5555-5555-555555555555",
+      "name": "Get Today's Appointments",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1050, 200],
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "PostgreSQL Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Business hours configuration\nconst BUSINESS_START = 9;  // 9 AM\nconst BUSINESS_END = 18;   // 6 PM\nconst SLOT_DURATION = 60;  // 60 minutes per appointment\n\n// Get existing appointments from previous node\nconst appointments = $input.all();\nconst today = $input.first().json.today;\nconst currentHour = $input.first().json.currentHour;\nconst phoneNumber = $input.first().json.phoneNumber;\nconst userId = $input.first().json.id;\n\n// Create array of all possible time slots\nconst allSlots = [];\nfor (let hour = BUSINESS_START; hour < BUSINESS_END; hour++) {\n  allSlots.push(`${hour.toString().padStart(2, '0')}:00`);\n}\n\n// Filter out booked slots\nconst bookedSlots = appointments.map(apt => {\n  if (apt.json.appointment_time) {\n    const time = apt.json.appointment_time;\n    return typeof time === 'string' ? time : time.toTimeString().substring(0, 5);\n  }\n  return null;\n}).filter(Boolean);\n\n// Get available slots (not booked and in the future if today)\nconst availableSlots = allSlots.filter(slot => {\n  const slotHour = parseInt(slot.split(':')[0]);\n  const isBooked = bookedSlots.includes(slot);\n  const isFuture = slotHour > currentHour;\n  return !isBooked && isFuture;\n});\n\n// Format response message\nlet message;\nif (availableSlots.length === 0) {\n  message = `Merhaba! Maalesef bugün için uygun randevu saati bulunmamaktadır. 😔\\n\\nLütfen başka bir gün için randevu almayı deneyin.`;\n} else {\n  message = `Merhaba! Bugün (${today}) için müsait saatlerimiz:\\n\\n`;\n  availableSlots.forEach((slot, index) => {\n    message += `${index + 1}. ${slot}\\n`;\n  });\n  message += `\\nRandevu almak için lütfen saati yazın (örn: 10:00, 14:00) 💇‍♀️`;\n}\n\nreturn {\n  json: {\n    phoneNumber: phoneNumber,\n    userId: userId,\n    message: message,\n    availableSlots: availableSlots,\n    today: today\n  }\n};"
+      },
+      "id": "a1b2c3d4-6666-6666-6666-666666666666",
+      "name": "Calculate Available Hours",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $json.phoneNumber }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "id": "a1b2c3d4-7777-7777-7777-777777777777",
+      "name": "Send Available Hours",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Business Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if message is a time format (HH:MM or H:MM)\nconst messageText = $input.item.json.messageText;\nconst timeRegex = /^(\\d{1,2}):(\\d{2})$/;\nconst match = messageText.match(timeRegex);\n\nif (!match) {\n  return {\n    json: {\n      ...($input.item.json),\n      isValidTime: false,\n      selectedTime: null\n    }\n  };\n}\n\nconst hour = parseInt(match[1]);\nconst minute = parseInt(match[2]);\n\n// Validate time format\nif (hour < 0 || hour > 23 || minute < 0 || minute > 59) {\n  return {\n    json: {\n      ...($input.item.json),\n      isValidTime: false,\n      selectedTime: null\n    }\n  };\n}\n\n// Format time as HH:MM\nconst formattedTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;\n\nreturn {\n  json: {\n    ...($input.item.json),\n    isValidTime: true,\n    selectedTime: formattedTime\n  }\n};"
+      },
+      "id": "a1b2c3d4-9001-9001-9001-900190019001",
+      "name": "Parse Time Selection",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isValidTime }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-9002-9002-9002-900290029002",
+      "name": "Check if Valid Time",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as count\nFROM appointments\nWHERE appointment_date = '{{ $json.today }}'\nAND appointment_time = '{{ $json.selectedTime }}'\nAND status IN ('confirmed', 'pending');",
+        "options": {}
+      },
+      "id": "a1b2c3d4-9003-9003-9003-900390039003",
+      "name": "Check Slot Availability",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "PostgreSQL Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.count }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-9004-9004-9004-900490049004",
+      "name": "Check if Slot Free",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO appointments (user_id, appointment_date, appointment_time, duration_minutes, status, created_at)\nVALUES ({{ $json.id }}, '{{ $json.today }}', '{{ $json.selectedTime }}', 60, 'confirmed', NOW())\nRETURNING id, appointment_date, appointment_time;",
+        "options": {}
+      },
+      "id": "a1b2c3d4-9005-9005-9005-900590059005",
+      "name": "Save Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1850, 200],
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "PostgreSQL Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $json.phoneNumber }}",
+        "text": "✅ Randevunuz başarıyla oluşturuldu!\n\n📅 Tarih: {{ $json.appointment_date }}\n⏰ Saat: {{ $json.appointment_time }}\n\nSize görüşmek için sabırsızlanıyoruz! 💇‍♀️\n\nİptal etmek için: /iptal",
+        "additionalFields": {}
+      },
+      "id": "a1b2c3d4-9006-9006-9006-900690069006",
+      "name": "Send Confirmation",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [2050, 200],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Business Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $json.phoneNumber }}",
+        "text": "❌ Maalesef seçtiğiniz saat artık müsait değil.\n\nGüncel saatleri görmek için /randevu yazın.",
+        "additionalFields": {}
+      },
+      "id": "a1b2c3d4-9007-9007-9007-900790079007",
+      "name": "Send Slot Taken Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1850, 400],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Business Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $json.phoneNumber }}",
+        "text": "❌ Geçersiz saat formatı.\n\nLütfen saati şu formatta yazın: 10:00, 14:00, 16:00\n\nYa da müsait saatleri görmek için /randevu yazın.",
+        "additionalFields": {}
+      },
+      "id": "a1b2c3d4-9008-9008-9008-900890089008",
+      "name": "Send Invalid Time Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1450, 500],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Business Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.messageText }}",
+              "operation": "equals",
+              "value2": "/iptal"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-9009-9009-9009-900990099009",
+      "name": "Check if /iptal",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT a.id, a.appointment_date, a.appointment_time\nFROM appointments a\nWHERE a.user_id = {{ $json.id }}\nAND a.status IN ('confirmed', 'pending')\nAND a.appointment_date >= CURRENT_DATE\nORDER BY a.appointment_date, a.appointment_time\nLIMIT 1;",
+        "options": {}
+      },
+      "id": "a1b2c3d4-9010-9010-9010-901090109010",
+      "name": "Get User's Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1050, 550],
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "PostgreSQL Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.id }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-9011-9011-9011-901190119011",
+      "name": "Check if Has Appointment",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 550]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE appointments\nSET status = 'cancelled', updated_at = NOW()\nWHERE id = {{ $json.id }}\nRETURNING appointment_date, appointment_time;",
+        "options": {}
+      },
+      "id": "a1b2c3d4-9012-9012-9012-901290129012",
+      "name": "Cancel Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 500],
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "PostgreSQL Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $json.phoneNumber }}",
+        "text": "✅ Randevunuz iptal edildi.\n\n📅 Tarih: {{ $json.appointment_date }}\n⏰ Saat: {{ $json.appointment_time }}\n\nYeni randevu almak için /randevu yazın.",
+        "additionalFields": {}
+      },
+      "id": "a1b2c3d4-9013-9013-9013-901390139013",
+      "name": "Send Cancellation Confirmation",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1650, 500],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Business Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $json.phoneNumber }}",
+        "text": "❌ İptal edilecek aktif randevunuz bulunmamaktadır.\n\nRandevu almak için /randevu yazın.",
+        "additionalFields": {}
+      },
+      "id": "a1b2c3d4-9014-9014-9014-901490149014",
+      "name": "Send No Appointment Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1450, 650],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Business Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Upsert User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert User": {
+      "main": [
+        [
+          {
+            "node": "Check if /randevu",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check if /iptal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if /randevu": {
+      "main": [
+        [
+          {
+            "node": "Get Today's Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Time Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Today's Appointments": {
+      "main": [
+        [
+          {
+            "node": "Calculate Available Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Available Hours": {
+      "main": [
+        [
+          {
+            "node": "Send Available Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Time Selection": {
+      "main": [
+        [
+          {
+            "node": "Check if Valid Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Valid Time": {
+      "main": [
+        [
+          {
+            "node": "Check Slot Availability",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Invalid Time Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Slot Availability": {
+      "main": [
+        [
+          {
+            "node": "Check if Slot Free",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Slot Free": {
+      "main": [
+        [
+          {
+            "node": "Save Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Slot Taken Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Appointment": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if /iptal": {
+      "main": [
+        [
+          {
+            "node": "Get User's Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User's Appointment": {
+      "main": [
+        [
+          {
+            "node": "Check if Has Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Has Appointment": {
+      "main": [
+        [
+          {
+            "node": "Cancel Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send No Appointment Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel Appointment": {
+      "main": [
+        [
+          {
+            "node": "Send Cancellation Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-11-27T00:00:00.000Z",
+  "versionId": "1"
+}

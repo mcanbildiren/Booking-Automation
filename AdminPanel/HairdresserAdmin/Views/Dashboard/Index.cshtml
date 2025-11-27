@@ -1,0 +1,234 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Randevular";
+}
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>
+                <i class="bi bi-calendar-check"></i> Randevular
+            </h2>
+            <div>
+                <form method="get" class="d-flex gap-2">
+                    <input type="date" name="date" class="form-control" 
+                           value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Göster
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="bi bi-calendar-today"></i> Bugün
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center border-primary">
+            <div class="card-body">
+                <h3 class="text-primary">@Model.TotalAppointments</h3>
+                <p class="mb-0">Toplam Randevu</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-success">
+            <div class="card-body">
+                <h3 class="text-success">@Model.ConfirmedAppointments</h3>
+                <p class="mb-0">Onaylandı</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-warning">
+            <div class="card-body">
+                <h3 class="text-warning">@Model.PendingAppointments</h3>
+                <p class="mb-0">Bekliyor</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-danger">
+            <div class="card-body">
+                <h3 class="text-danger">@Model.CancelledAppointments</h3>
+                <p class="mb-0">İptal</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.Appointments.Any())
+{
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-list-check"></i> 
+                @Model.SelectedDate.ToString("dd MMMM yyyy, dddd") - Randevu Listesi
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="10%">Saat</th>
+                            <th width="20%">Müşteri</th>
+                            <th width="15%">Telefon</th>
+                            <th width="10%">Süre</th>
+                            <th width="15%">Durum</th>
+                            <th width="20%">Hizmet</th>
+                            <th width="10%">İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var appointment in Model.Appointments)
+                        {
+                            <tr>
+                                <td>
+                                    <strong><i class="bi bi-clock"></i> @appointment.Time</strong>
+                                </td>
+                                <td>
+                                    <i class="bi bi-person"></i> @appointment.CustomerName
+                                </td>
+                                <td>
+                                    <a href="tel:@appointment.PhoneNumber" class="text-decoration-none">
+                                        <i class="bi bi-telephone"></i> @appointment.PhoneNumber
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">@appointment.DurationMinutes dk</span>
+                                </td>
+                                <td>
+                                    <span class="@appointment.StatusBadgeClass">
+                                        @appointment.StatusText
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(appointment.ServiceType))
+                                    {
+                                        <span>@appointment.ServiceType</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#detailsModal@(appointment.Id)">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-secondary dropdown-toggle" 
+                                                    data-bs-toggle="dropdown">
+                                                <i class="bi bi-gear"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <form method="post" asp-action="UpdateStatus" class="d-inline">
+                                                        <input type="hidden" name="id" value="@appointment.Id" />
+                                                        <input type="hidden" name="status" value="confirmed" />
+                                                        <button type="submit" class="dropdown-item">
+                                                            <i class="bi bi-check-circle text-success"></i> Onayla
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form method="post" asp-action="UpdateStatus" class="d-inline">
+                                                        <input type="hidden" name="id" value="@appointment.Id" />
+                                                        <input type="hidden" name="status" value="completed" />
+                                                        <button type="submit" class="dropdown-item">
+                                                            <i class="bi bi-check-all text-info"></i> Tamamlandı
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <form method="post" asp-action="UpdateStatus" class="d-inline">
+                                                        <input type="hidden" name="id" value="@appointment.Id" />
+                                                        <input type="hidden" name="status" value="cancelled" />
+                                                        <button type="submit" class="dropdown-item">
+                                                            <i class="bi bi-x-circle text-danger"></i> İptal Et
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Details Modal -->
+                            <div class="modal fade" id="detailsModal@(appointment.Id)" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Randevu Detayları</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <dl class="row">
+                                                <dt class="col-sm-4">Saat:</dt>
+                                                <dd class="col-sm-8">@appointment.Time</dd>
+
+                                                <dt class="col-sm-4">Müşteri:</dt>
+                                                <dd class="col-sm-8">@appointment.CustomerName</dd>
+
+                                                <dt class="col-sm-4">Telefon:</dt>
+                                                <dd class="col-sm-8">@appointment.PhoneNumber</dd>
+
+                                                <dt class="col-sm-4">Durum:</dt>
+                                                <dd class="col-sm-8">
+                                                    <span class="@appointment.StatusBadgeClass">@appointment.StatusText</span>
+                                                </dd>
+
+                                                <dt class="col-sm-4">Hizmet:</dt>
+                                                <dd class="col-sm-8">@(appointment.ServiceType ?? "-")</dd>
+
+                                                <dt class="col-sm-4">Süre:</dt>
+                                                <dd class="col-sm-8">@appointment.DurationMinutes dakika</dd>
+
+                                                @if (!string.IsNullOrEmpty(appointment.Notes))
+                                                {
+                                                    <dt class="col-sm-4">Notlar:</dt>
+                                                    <dd class="col-sm-8">@appointment.Notes</dd>
+                                                }
+                                            </dl>
+
+                                            <form method="post" asp-action="UpdateNotes" class="mt-3">
+                                                <input type="hidden" name="id" value="@appointment.Id" />
+                                                <div class="mb-3">
+                                                    <label class="form-label">Not Ekle/Güncelle:</label>
+                                                    <textarea name="notes" class="form-control" rows="3">@appointment.Notes</textarea>
+                                                </div>
+                                                <button type="submit" class="btn btn-primary btn-sm">
+                                                    <i class="bi bi-save"></i> Kaydet
+                                                </button>
+                                            </form>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info text-center">
+        <i class="bi bi-info-circle"></i> 
+        <strong>@Model.SelectedDate.ToString("dd MMMM yyyy")</strong> tarihinde randevu bulunmamaktadır.
+    </div>
+}
+
