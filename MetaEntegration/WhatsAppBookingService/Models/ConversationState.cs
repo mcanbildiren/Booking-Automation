@@ -1,0 +1,27 @@
+namespace WhatsAppBookingService.Models
+{
+    /// <summary>
+    /// Represents the conversation state for a user
+    /// This is stored in-memory (could be Redis in production)
+    /// </summary>
+    public class ConversationState
+    {
+        public string PhoneNumber { get; set; } = null!;
+        public ConversationStep CurrentStep { get; set; } = ConversationStep.Initial;
+        public DateOnly? SelectedDate { get; set; }
+        public TimeOnly? SelectedTime { get; set; }
+        public string? ServiceType { get; set; }
+        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+    }
+
+    public enum ConversationStep
+    {
+        Initial,
+        AwaitingDate,
+        AwaitingTime,
+        AwaitingServiceType,
+        ConfirmingAppointment,
+        CancellingAppointment
+    }
+}
+
