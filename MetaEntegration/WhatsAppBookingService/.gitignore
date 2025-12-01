@@ -41,9 +41,13 @@ logs/
 *.publishsettings
 node_modules/
 .env
+.env.local
 *.swp
 *~
 
 # Mac
 .DS_Store
+
+# Shell scripts output
+*.pid
 
