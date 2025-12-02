@@ -44,8 +44,8 @@ namespace WhatsAppBookingService.Controllers
                 return Ok(challenge);
             }
 
-            _logger.LogWarning("Webhook verification failed. Invalid token.");
-            return Forbid();
+            _logger.LogWarning("Webhook verification failed. Invalid token. Expected: {Expected}, Received: {Received}", verifyToken, token);
+            return StatusCode(403, "Forbidden: Invalid verify token");
         }
 
         /// <summary>
