@@ -13,6 +13,9 @@ namespace HairdresserAdmin.Models
         [Column("user_id")]
         public int UserId { get; set; }
 
+        [Column("worker_id")]
+        public int WorkerId { get; set; }
+
         [Column("appointment_date")]
         [Required]
         public DateOnly AppointmentDate { get; set; }
@@ -42,9 +45,12 @@ namespace HairdresserAdmin.Models
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; }
 
-        // Navigation property
+        // Navigation properties
         [ForeignKey("UserId")]
         public User User { get; set; } = null!;
+
+        [ForeignKey("WorkerId")]
+        public Worker? Worker { get; set; }
     }
 }
 

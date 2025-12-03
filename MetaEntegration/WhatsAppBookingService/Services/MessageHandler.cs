@@ -77,7 +77,11 @@ namespace WhatsAppBookingService.Services
             }
 
             // Handle based on reply ID pattern
-            if (replyId.StartsWith("date_"))
+            if (replyId.StartsWith("worker_"))
+            {
+                await HandleWorkerSelectionAsync(from, replyId, state);
+            }
+            else if (replyId.StartsWith("date_"))
             {
                 await HandleDateSelectionAsync(from, replyId, state, user.Id);
             }
@@ -122,7 +126,7 @@ namespace WhatsAppBookingService.Services
 
 *Nasıl Çalışır:*
 1. `/randevu` yazın
-2. Müsait tarihleri görün
+2. Çalışan seçin
 3. Tarih seçin
 4. Müsait saatleri görün
 5. Saat seçin
@@ -135,7 +139,61 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
 
         private async Task StartBookingFlowAsync(string from)
         {
-            // Show available dates for next 7 days
+            // STEP 1: Show available workers
+            var workers = await _bookingService.GetActiveWorkersAsync();
+
+            if (workers.Count == 0)
+            {
+                await _whatsAppService.SendTextMessageAsync(from, "❌ Şu anda müsait çalışan bulunmamaktadır. Lütfen daha sonra tekrar deneyin.");
+                return;
+            }
+
+            var workerList = workers.Select(w => (
+                $"worker_{w.Id}",
+                w.Name,
+                w.Specialty ?? "Kuaför"
+            )).ToList();
+
+            var state = new ConversationState
+            {
+                PhoneNumber = from,
+                CurrentStep = ConversationStep.AwaitingWorker
+            };
+
+            await _conversationService.UpdateStateAsync(state);
+
+            await _whatsAppService.SendInteractiveListAsync(
+                from,
+                "💇 Lütfen randevu almak istediğiniz çalışanı seçin:",
+                "Çalışan Seç",
+                workerList!
+            );
+        }
+
+        private async Task HandleWorkerSelectionAsync(string from, string replyId, ConversationState state)
+        {
+            // Extract worker ID from replyId (format: worker_123)
+            var workerIdString = replyId.Replace("worker_", "");
+            if (!int.TryParse(workerIdString, out var workerId))
+            {
+                await _whatsAppService.SendTextMessageAsync(from, "❌ Geçersiz seçim. Lütfen tekrar deneyin.");
+                return;
+            }
+
+            var worker = await _bookingService.GetWorkerByIdAsync(workerId);
+            if (worker == null)
+            {
+                await _whatsAppService.SendTextMessageAsync(from, "❌ Çalışan bulunamadı. Lütfen tekrar deneyin.");
+                return;
+            }
+
+            // Update state with selected worker
+            state.SelectedWorkerId = workerId;
+            state.SelectedWorkerName = worker.Name;
+            state.CurrentStep = ConversationStep.AwaitingDate;
+            await _conversationService.UpdateStateAsync(state);
+
+            // STEP 2: Show available dates for next 7 days
             var availableDates = new List<(string id, string title, string? description)>();
             var today = DateOnly.FromDateTime(DateTime.Today);
 
@@ -152,17 +210,9 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
                 ));
             }
 
-            var state = new ConversationState
-            {
-                PhoneNumber = from,
-                CurrentStep = ConversationStep.AwaitingDate
-            };
-
-            await _conversationService.UpdateStateAsync(state);
-
             await _whatsAppService.SendInteractiveListAsync(
                 from,
-                "📅 Lütfen randevu için bir tarih seçin:",
+                $"✅ Çalışan: *{worker.Name}*\n\n📅 Lütfen randevu için bir tarih seçin:",
                 "Tarih Seç",
                 availableDates
             );
@@ -178,31 +228,40 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
                 return;
             }
 
+            // Make sure we have a worker selected
+            if (!state.SelectedWorkerId.HasValue)
+            {
+                await _whatsAppService.SendTextMessageAsync(from, "❌ Lütfen önce bir çalışan seçin. /randevu");
+                await _conversationService.ClearStateAsync(from);
+                return;
+            }
+
             state.SelectedDate = selectedDate;
             state.CurrentStep = ConversationStep.AwaitingTime;
             await _conversationService.UpdateStateAsync(state);
 
-            // Get available time slots
-            var availableSlots = await _bookingService.GetAvailableTimeSlotsAsync(selectedDate);
+            // STEP 3: Get available time slots for this worker on this date
+            var availableSlots = await _bookingService.GetAvailableTimeSlotsForWorkerAsync(state.SelectedWorkerId.Value, selectedDate);
 
             if (availableSlots.Count == 0)
             {
-                await _whatsAppService.SendTextMessageAsync(from, "❌ Bu tarih için müsait saat yok. Lütfen başka bir tarih seçin. /randevu");
+                await _whatsAppService.SendTextMessageAsync(from, $"❌ {state.SelectedWorkerName} için bu tarihte müsait saat yok. Lütfen başka bir tarih seçin. /randevu");
                 await _conversationService.ClearStateAsync(from);
                 return;
             }
 
             var timeButtons = availableSlots.Take(10).Select(time => (
                 $"time_{time:HH:mm}",
-                time.ToString("HH:mm")
+                time.ToString("HH:mm"),
+                (string?)null
             )).ToList();
 
             var formattedDate = selectedDate.ToString("dd MMMM yyyy", new CultureInfo("tr-TR"));
             await _whatsAppService.SendInteractiveListAsync(
                 from,
-                $"🕐 {formattedDate} için müsait saatler:\n\nLütfen bir saat seçin:",
+                $"✅ Çalışan: *{state.SelectedWorkerName}*\n📅 Tarih: *{formattedDate}*\n\n🕐 Lütfen bir saat seçin:",
                 "Saat Seç",
-                timeButtons.Select(tb => (tb.Item1, tb.Item2, (string?)null)).ToList()
+                timeButtons
             );
         }
 
@@ -220,13 +279,13 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
             state.CurrentStep = ConversationStep.ConfirmingAppointment;
             await _conversationService.UpdateStateAsync(state);
 
-            // Show confirmation
+            // STEP 4: Show confirmation with all details
             var formattedDate = state.SelectedDate!.Value.ToString("dd MMMM yyyy", new CultureInfo("tr-TR"));
             var formattedTime = selectedTime.ToString("HH:mm");
 
             await _whatsAppService.SendInteractiveButtonsAsync(
                 from,
-                $"✅ Randevu Onayı\n\n📅 Tarih: {formattedDate}\n🕐 Saat: {formattedTime}\n\nRandevunuzu onaylıyor musunuz?",
+                $"✅ *Randevu Onayı*\n\n💇 Çalışan: *{state.SelectedWorkerName}*\n📅 Tarih: *{formattedDate}*\n🕐 Saat: *{formattedTime}*\n\nRandevunuzu onaylıyor musunuz?",
                 new List<(string id, string title)>
                 {
                     ("confirm_yes", "✅ Evet, Onayla"),
@@ -237,15 +296,17 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
 
         private async Task ConfirmAppointmentAsync(string from, ConversationState state, int userId)
         {
-            if (!state.SelectedDate.HasValue || !state.SelectedTime.HasValue)
+            if (!state.SelectedDate.HasValue || !state.SelectedTime.HasValue || !state.SelectedWorkerId.HasValue)
             {
-                await _whatsAppService.SendTextMessageAsync(from, "❌ Bir hata oluştu. Lütfen tekrar deneyin.");
+                await _whatsAppService.SendTextMessageAsync(from, "❌ Bir hata oluştu. Lütfen tekrar deneyin. /randevu");
                 await _conversationService.ClearStateAsync(from);
                 return;
             }
 
+            // Create appointment with worker
             var appointment = await _bookingService.CreateAppointmentAsync(
                 userId,
+                state.SelectedWorkerId.Value,
                 state.SelectedDate.Value,
                 state.SelectedTime.Value,
                 state.ServiceType
@@ -263,9 +324,10 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
 
             var confirmationMessage = $@"✅ *Randevunuz Oluşturuldu!*
 
-📅 Tarih: {formattedDate}
-🕐 Saat: {formattedTime}
-📝 Randevu No: {appointment.Id}
+💇 Çalışan: *{state.SelectedWorkerName}*
+📅 Tarih: *{formattedDate}*
+🕐 Saat: *{formattedTime}*
+📝 Randevu No: *{appointment.Id}*
 
 Randevunuzu iptal etmek için: /iptal
 
@@ -288,7 +350,7 @@ Görüşmek üzere! 👋";
             var appointmentList = appointments.Select(a => (
                 $"cancel_{a.Id}",
                 $"{a.AppointmentDate:dd/MM/yyyy} {a.AppointmentTime:HH:mm}",
-                (string?)$"Randevu No: {a.Id}"
+                (string?)$"{a.Worker?.Name ?? "Kuaför"} - No: {a.Id}"
             )).ToList();
 
             await _whatsAppService.SendInteractiveListAsync(
@@ -328,4 +390,3 @@ Görüşmek üzere! 👋";
         }
     }
 }
-

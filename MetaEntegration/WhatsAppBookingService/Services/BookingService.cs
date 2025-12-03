@@ -46,21 +46,50 @@ namespace WhatsAppBookingService.Services
             return user;
         }
 
-        public async Task<List<TimeOnly>> GetAvailableTimeSlotsAsync(DateOnly date)
-        {
-            // Get business hours from config
-            var startHourConfig = await _context.BusinessConfigs.FirstOrDefaultAsync(c => c.ConfigKey == "business_start_hour");
-            var endHourConfig = await _context.BusinessConfigs.FirstOrDefaultAsync(c => c.ConfigKey == "business_end_hour");
-            var slotDurationConfig = await _context.BusinessConfigs.FirstOrDefaultAsync(c => c.ConfigKey == "slot_duration_minutes");
+        #region Worker Methods
 
-            int startHour = int.Parse(startHourConfig?.ConfigValue ?? "9");
-            int endHour = int.Parse(endHourConfig?.ConfigValue ?? "18");
+        public async Task<List<Worker>> GetActiveWorkersAsync()
+        {
+            return await _context.Workers
+                .Where(w => w.IsActive)
+                .OrderBy(w => w.Name)
+                .ToListAsync();
+        }
+
+        public async Task<Worker?> GetWorkerByIdAsync(int workerId)
+        {
+            return await _context.Workers
+                .Include(w => w.Schedules)
+                .FirstOrDefaultAsync(w => w.Id == workerId && w.IsActive);
+        }
+
+        #endregion
+
+        #region Availability Methods
+
+        public async Task<List<TimeOnly>> GetAvailableTimeSlotsForWorkerAsync(int workerId, DateOnly date)
+        {
+            // Get the worker's schedule for this day of the week
+            int dayOfWeek = (int)date.DayOfWeek;
+            
+            var workerSchedule = await _context.WorkerSchedules
+                .FirstOrDefaultAsync(ws => ws.WorkerId == workerId && ws.DayOfWeek == dayOfWeek && ws.IsWorking);
+
+            // If worker doesn't work on this day, return empty list
+            if (workerSchedule == null)
+            {
+                _logger.LogInformation("Worker {WorkerId} is not working on {DayOfWeek}", workerId, date.DayOfWeek);
+                return new List<TimeOnly>();
+            }
+
+            // Get slot duration from config (default 60 minutes)
+            var slotDurationConfig = await _context.BusinessConfigs.FirstOrDefaultAsync(c => c.ConfigKey == "slot_duration_minutes");
             int slotDuration = int.Parse(slotDurationConfig?.ConfigValue ?? "60");
 
-            // Generate all possible time slots
+            // Generate all possible time slots based on worker's schedule
             var allSlots = new List<TimeOnly>();
-            var currentTime = new TimeOnly(startHour, 0);
-            var endTime = new TimeOnly(endHour, 0);
+            var currentTime = workerSchedule.StartTime;
+            var endTime = workerSchedule.EndTime;
 
             while (currentTime < endTime)
             {
@@ -68,9 +97,9 @@ namespace WhatsAppBookingService.Services
                 currentTime = currentTime.AddMinutes(slotDuration);
             }
 
-            // Get booked appointments for this date
+            // Get booked appointments for this worker on this date
             var bookedTimes = await _context.Appointments
-                .Where(a => a.AppointmentDate == date && a.Status != "cancelled")
+                .Where(a => a.WorkerId == workerId && a.AppointmentDate == date && a.Status != "cancelled")
                 .Select(a => a.AppointmentTime)
                 .ToListAsync();
 
@@ -78,23 +107,28 @@ namespace WhatsAppBookingService.Services
             return allSlots.Where(slot => !bookedTimes.Contains(slot)).ToList();
         }
 
-        public async Task<Appointment?> CreateAppointmentAsync(int userId, DateOnly date, TimeOnly time, string? serviceType)
+        #endregion
+
+        #region Appointment Methods
+
+        public async Task<Appointment?> CreateAppointmentAsync(int userId, int workerId, DateOnly date, TimeOnly time, string? serviceType)
         {
             try
             {
-                // Check if slot is still available
+                // Check if slot is still available for this worker
                 var existingAppointment = await _context.Appointments
-                    .FirstOrDefaultAsync(a => a.AppointmentDate == date && a.AppointmentTime == time && a.Status != "cancelled");
+                    .FirstOrDefaultAsync(a => a.WorkerId == workerId && a.AppointmentDate == date && a.AppointmentTime == time && a.Status != "cancelled");
 
                 if (existingAppointment != null)
                 {
-                    _logger.LogWarning("Time slot already booked: {Date} {Time}", date, time);
+                    _logger.LogWarning("Time slot already booked for worker {WorkerId}: {Date} {Time}", workerId, date, time);
                     return null;
                 }
 
                 var appointment = new Appointment
                 {
                     UserId = userId,
+                    WorkerId = workerId,
                     AppointmentDate = date,
                     AppointmentTime = time,
                     ServiceType = serviceType,
@@ -106,7 +140,7 @@ namespace WhatsAppBookingService.Services
                 _context.Appointments.Add(appointment);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Created appointment for user {UserId} on {Date} at {Time}", userId, date, time);
+                _logger.LogInformation("Created appointment for user {UserId} with worker {WorkerId} on {Date} at {Time}", userId, workerId, date, time);
                 return appointment;
             }
             catch (Exception ex)
@@ -146,11 +180,14 @@ namespace WhatsAppBookingService.Services
         public async Task<List<Appointment>> GetUserAppointmentsAsync(int userId)
         {
             return await _context.Appointments
+                .Include(a => a.Worker)
                 .Where(a => a.UserId == userId && a.Status != "cancelled")
                 .OrderBy(a => a.AppointmentDate)
                 .ThenBy(a => a.AppointmentTime)
                 .ToListAsync();
         }
+
+        #endregion
     }
 }
 

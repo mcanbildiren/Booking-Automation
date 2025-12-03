@@ -8,6 +8,8 @@ namespace WhatsAppBookingService.Models
     {
         public string PhoneNumber { get; set; } = null!;
         public ConversationStep CurrentStep { get; set; } = ConversationStep.Initial;
+        public int? SelectedWorkerId { get; set; }
+        public string? SelectedWorkerName { get; set; }
         public DateOnly? SelectedDate { get; set; }
         public TimeOnly? SelectedTime { get; set; }
         public string? ServiceType { get; set; }
@@ -17,6 +19,7 @@ namespace WhatsAppBookingService.Models
     public enum ConversationStep
     {
         Initial,
+        AwaitingWorker,      // NEW: Select a worker first
         AwaitingDate,
         AwaitingTime,
         AwaitingServiceType,

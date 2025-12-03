@@ -8,6 +8,16 @@ namespace HairdresserAdmin.Models.ViewModels
         public int ConfirmedAppointments { get; set; }
         public int PendingAppointments { get; set; }
         public int CancelledAppointments { get; set; }
+        
+        // Calendar data
+        public List<CalendarDayViewModel> CalendarDays { get; set; } = new();
+        public int CurrentMonth { get; set; }
+        public int CurrentYear { get; set; }
+        public string MonthName { get; set; } = string.Empty;
+        
+        // Workers for filtering
+        public List<WorkerFilterViewModel> Workers { get; set; } = new();
+        public int? SelectedWorkerId { get; set; }
     }
 
     public class AppointmentViewModel
@@ -20,6 +30,10 @@ namespace HairdresserAdmin.Models.ViewModels
         public string? ServiceType { get; set; }
         public string? Notes { get; set; }
         public int DurationMinutes { get; set; }
+        
+        // Worker info
+        public int WorkerId { get; set; }
+        public string WorkerName { get; set; } = string.Empty;
 
         public string StatusBadgeClass => Status switch
         {
@@ -38,6 +52,22 @@ namespace HairdresserAdmin.Models.ViewModels
             "completed" => "Tamamlandı",
             _ => Status
         };
+    }
+
+    public class CalendarDayViewModel
+    {
+        public DateOnly Date { get; set; }
+        public int Day { get; set; }
+        public bool IsCurrentMonth { get; set; }
+        public bool IsToday { get; set; }
+        public bool IsSelected { get; set; }
+        public int AppointmentCount { get; set; }
+    }
+
+    public class WorkerFilterViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }
 
