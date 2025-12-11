@@ -74,22 +74,45 @@ namespace HairdresserAdmin.Controllers
                 })
                 .ToListAsync();
 
-            // Build calendar data
-            var calendarDays = BuildCalendarDays(calendarYear, calendarMonth, selectedDate, workerId);
+            // Build calendar data - AWAIT IMMEDIATELY to avoid DbContext concurrency issues
+            var calendarDays = await BuildCalendarDays(calendarYear, calendarMonth, selectedDate, workerId);
 
             // Get month name in Turkish
             var culture = new CultureInfo("tr-TR");
             var monthName = culture.DateTimeFormat.GetMonthName(calendarMonth);
 
+            // Calculate monthly statistics
+            var firstDayOfMonth = new DateOnly(calendarYear, calendarMonth, 1);
+            var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+            
+            var statsQuery = _context.Appointments
+                .Where(a => a.AppointmentDate >= firstDayOfMonth && a.AppointmentDate <= lastDayOfMonth);
+
+            if (workerId.HasValue && workerId.Value > 0)
+            {
+                statsQuery = statsQuery.Where(a => a.WorkerId == workerId.Value);
+            }
+
+            var stats = await statsQuery
+                .GroupBy(a => a.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Status, x => x.Count);
+
+            var totalMonthlyAppointments = stats.Values.Sum();
+            var confirmedMonthly = stats.GetValueOrDefault("confirmed", 0);
+            var pendingMonthly = stats.GetValueOrDefault("pending", 0);
+            var cancelledMonthly = stats.GetValueOrDefault("cancelled", 0);
+            var completedMonthly = stats.GetValueOrDefault("completed", 0);
+
             var viewModel = new DashboardViewModel
             {
                 SelectedDate = selectedDate,
                 Appointments = appointments,
-                TotalAppointments = appointments.Count,
-                ConfirmedAppointments = appointments.Count(a => a.Status == "confirmed"),
-                PendingAppointments = appointments.Count(a => a.Status == "pending"),
-                CancelledAppointments = appointments.Count(a => a.Status == "cancelled"),
-                CalendarDays = await calendarDays,
+                TotalAppointments = totalMonthlyAppointments,
+                ConfirmedAppointments = confirmedMonthly + completedMonthly,
+                PendingAppointments = pendingMonthly,
+                CancelledAppointments = cancelledMonthly,
+                CalendarDays = calendarDays,
                 CurrentMonth = calendarMonth,
                 CurrentYear = calendarYear,
                 MonthName = monthName,
@@ -201,9 +224,9 @@ namespace HairdresserAdmin.Controllers
             return View(appointment);
         }
 
-        // API endpoint for calendar events (optional, for AJAX)
+        // Return partial view for day appointments
         [HttpGet]
-        public async Task<IActionResult> GetAppointments(string date, int? workerId)
+        public async Task<IActionResult> GetDayAppointmentsPartial(string date, int? workerId)
         {
             if (!DateOnly.TryParse(date, out var selectedDate))
             {
@@ -222,18 +245,22 @@ namespace HairdresserAdmin.Controllers
 
             var appointments = await query
                 .OrderBy(a => a.AppointmentTime)
-                .Select(a => new
+                .Select(a => new AppointmentViewModel
                 {
-                    a.Id,
+                    Id = a.Id,
                     Time = a.AppointmentTime.ToString("HH:mm"),
                     CustomerName = a.User.Name ?? "Misafir",
-                    a.User.PhoneNumber,
-                    a.Status,
+                    PhoneNumber = a.User.PhoneNumber,
+                    Status = a.Status,
+                    ServiceType = a.ServiceType,
+                    Notes = a.Notes,
+                    DurationMinutes = a.DurationMinutes,
+                    WorkerId = a.WorkerId,
                     WorkerName = a.Worker != null ? a.Worker.Name : "Atanmamış"
                 })
                 .ToListAsync();
 
-            return Json(appointments);
+            return PartialView("_DayAppointments", appointments);
         }
     }
 }

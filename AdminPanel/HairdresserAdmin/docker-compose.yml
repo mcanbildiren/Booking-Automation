@@ -2,12 +2,18 @@ version: '3.8'
 
 services:
   admin-panel:
-    build: .
+    # Use SDK image for development to support dotnet watch
+    image: mcr.microsoft.com/dotnet/sdk:8.0
     ports:
       - "5002:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=hairdresser_booking;Username=postgres;Password=${DB_PASSWORD:-postgres123}
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: dotnet watch run --urls http://+:80
     depends_on:
       db:
         condition: service_healthy
