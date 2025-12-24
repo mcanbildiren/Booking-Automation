@@ -18,7 +18,6 @@ namespace HairdresserAdmin.Models.ViewModels
         [Display(Name = "Aktif")]
         public bool IsActive { get; set; } = true;
 
-        // Schedule for each day of the week
         public List<WorkerScheduleViewModel> Schedules { get; set; } = new();
     }
 

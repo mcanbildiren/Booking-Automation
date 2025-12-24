@@ -31,8 +31,8 @@ namespace WhatsAppBookingService.Controllers
         /// </summary>
         [HttpGet]
         public IActionResult VerifyWebhook([FromQuery(Name = "hub.mode")] string mode,
-                                           [FromQuery(Name = "hub.verify_token")] string token,
-                                           [FromQuery(Name = "hub.challenge")] string challenge)
+            [FromQuery(Name = "hub.verify_token")] string token,
+            [FromQuery(Name = "hub.challenge")] string challenge)
         {
             _logger.LogInformation("Webhook verification requested. Mode: {Mode}, Token: {Token}", mode, token);
 
@@ -44,7 +44,8 @@ namespace WhatsAppBookingService.Controllers
                 return Ok(challenge);
             }
 
-            _logger.LogWarning("Webhook verification failed. Invalid token. Expected: {Expected}, Received: {Received}", verifyToken, token);
+            _logger.LogWarning("Webhook verification failed. Invalid token. Expected: {Expected}, Received: {Received}",
+                verifyToken, token);
             return StatusCode(403, "Forbidden: Invalid verify token");
         }
 
@@ -73,15 +74,12 @@ namespace WhatsAppBookingService.Controllers
 
                         var value = change.Value;
 
-                        // Process incoming messages
                         if (value.Messages != null)
                         {
                             foreach (var message in value.Messages)
                             {
-                                // Mark as read
                                 await _whatsAppService.MarkMessageAsReadAsync(message.Id);
 
-                                // Get sender name
                                 string? senderName = null;
                                 if (value.Contacts != null)
                                 {
@@ -89,7 +87,6 @@ namespace WhatsAppBookingService.Controllers
                                     senderName = contact?.Profile?.Name;
                                 }
 
-                                // Handle different message types
                                 if (message.Type == "text" && message.Text != null)
                                 {
                                     await _messageHandler.HandleIncomingMessageAsync(
@@ -121,12 +118,12 @@ namespace WhatsAppBookingService.Controllers
                             }
                         }
 
-                        // Log status updates (delivery, read receipts, etc.)
                         if (value.Statuses != null)
                         {
                             foreach (var status in value.Statuses)
                             {
-                                _logger.LogInformation("Message status update: {MessageId} - {Status}", status.Id, status.Status);
+                                _logger.LogInformation("Message status update: {MessageId} - {Status}", status.Id,
+                                    status.Status);
                             }
                         }
                     }
@@ -137,9 +134,8 @@ namespace WhatsAppBookingService.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing webhook");
-                return Ok(); // Return 200 to acknowledge receipt even on error
+                return Ok();
             }
         }
     }
 }
-

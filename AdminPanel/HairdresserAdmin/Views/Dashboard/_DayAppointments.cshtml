@@ -1,7 +1,24 @@
 @model IEnumerable<HairdresserAdmin.Models.ViewModels.AppointmentViewModel>
+@{
+    var selectedDate = ViewData["SelectedDate"] as string ?? "";
+    var selectedWorkerId = ViewData["SelectedWorkerId"] as int?;
+}
 
 @if (Model.Any())
 {
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="text-muted small">
+            Toplam: <strong>@Model.Count()</strong>
+        </div>
+        <a class="btn btn-sm btn-primary"
+           asp-controller="Appointments"
+           asp-action="Create"
+           asp-route-date="@selectedDate"
+           asp-route-workerId="@selectedWorkerId">
+            <i class="bi bi-plus-circle"></i> Yeni Randevu
+        </a>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-hover mb-0">
             <thead class="table-light">
@@ -33,13 +50,29 @@
                             </span>
                         </td>
                         <td>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-outline-success" onclick="updateStatus(@appointment.Id, 'confirmed')">
-                                    <i class="bi bi-check"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-danger" onclick="updateStatus(@appointment.Id, 'cancelled')">
-                                    <i class="bi bi-x"></i>
-                                </button>
+                            <div class="d-flex gap-2 justify-content-end">
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-success" onclick="updateStatus(@appointment.Id, 'confirmed')">
+                                        <i class="bi bi-check"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" onclick="updateStatus(@appointment.Id, 'cancelled')">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <a class="btn btn-outline-primary"
+                                       asp-controller="Appointments"
+                                       asp-action="Edit"
+                                       asp-route-id="@appointment.Id">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a class="btn btn-outline-danger"
+                                       asp-controller="Appointments"
+                                       asp-action="Delete"
+                                       asp-route-id="@appointment.Id">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
                             </div>
                         </td>
                     </tr>

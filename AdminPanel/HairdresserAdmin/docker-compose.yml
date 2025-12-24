@@ -3,7 +3,7 @@ version: '3.8'
 services:
   admin-panel:
     # Use SDK image for development to support dotnet watch
-    image: mcr.microsoft.com/dotnet/sdk:8.0
+    image: mcr.microsoft.com/dotnet/sdk:10.0
     ports:
       - "5002:80"
     environment:
@@ -17,6 +17,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-network
+
+  ngrok-admin:
+    image: ngrok/ngrok:latest
+    command: http admin-panel:80
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "4041:4040"
+    depends_on:
+      - admin-panel
     restart: unless-stopped
     networks:
       - booking-network

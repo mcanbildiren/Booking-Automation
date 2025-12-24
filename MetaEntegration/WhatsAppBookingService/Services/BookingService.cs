@@ -4,20 +4,43 @@ using WhatsAppBookingService.Models;
 
 namespace WhatsAppBookingService.Services
 {
-    public class BookingService : IBookingService
+    public class BookingService(ApplicationDbContext context, ILogger<BookingService> logger)
+        : IBookingService
     {
-        private readonly ApplicationDbContext _context;
-        private readonly ILogger<BookingService> _logger;
+        private static TimeZoneInfo? _turkeyTimeZone;
 
-        public BookingService(ApplicationDbContext context, ILogger<BookingService> logger)
+        /// <summary>
+        /// Gets current time in Turkey timezone (UTC+3, handles DST).
+        /// Cross-platform: tries "Europe/Istanbul" (Linux/macOS) then "Turkey Standard Time" (Windows).
+        /// </summary>
+        private DateTime GetTurkeyTime()
         {
-            _context = context;
-            _logger = logger;
+            if (_turkeyTimeZone == null)
+            {
+                try
+                {
+                    _turkeyTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul");
+                }
+                catch
+                {
+                    try
+                    {
+                        _turkeyTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+                    }
+                    catch
+                    {
+                        logger.LogWarning("Turkey timezone not found on this system. Using fixed UTC+3 offset.");
+                        return DateTime.UtcNow.AddHours(3);
+                    }
+                }
+            }
+
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _turkeyTimeZone);
         }
 
         public async Task<User> GetOrCreateUserAsync(string phoneNumber, string? name)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
+            var user = await context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
 
             if (user == null)
             {
@@ -29,9 +52,9 @@ namespace WhatsAppBookingService.Services
                     LastContact = DateTime.UtcNow
                 };
 
-                _context.Users.Add(user);
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Created new user: {PhoneNumber}", phoneNumber);
+                context.Users.Add(user);
+                await context.SaveChangesAsync();
+                logger.LogInformation("Created new user: {PhoneNumber}", phoneNumber);
             }
             else
             {
@@ -40,7 +63,8 @@ namespace WhatsAppBookingService.Services
                 {
                     user.Name = name;
                 }
-                await _context.SaveChangesAsync();
+
+                await context.SaveChangesAsync();
             }
 
             return user;
@@ -50,7 +74,7 @@ namespace WhatsAppBookingService.Services
 
         public async Task<List<Worker>> GetActiveWorkersAsync()
         {
-            return await _context.Workers
+            return await context.Workers
                 .Where(w => w.IsActive)
                 .OrderBy(w => w.Name)
                 .ToListAsync();
@@ -58,7 +82,7 @@ namespace WhatsAppBookingService.Services
 
         public async Task<Worker?> GetWorkerByIdAsync(int workerId)
         {
-            return await _context.Workers
+            return await context.Workers
                 .Include(w => w.Schedules)
                 .FirstOrDefaultAsync(w => w.Id == workerId && w.IsActive);
         }
@@ -67,26 +91,35 @@ namespace WhatsAppBookingService.Services
 
         #region Availability Methods
 
-        public async Task<List<TimeOnly>> GetAvailableTimeSlotsForWorkerAsync(int workerId, DateOnly date)
+        public async Task<List<TimeOnly>> GetAvailableTimeSlotsForWorkerAsync(
+            int workerId,
+            DateOnly date)
         {
-            // Get the worker's schedule for this day of the week
             int dayOfWeek = (int)date.DayOfWeek;
-            
-            var workerSchedule = await _context.WorkerSchedules
-                .FirstOrDefaultAsync(ws => ws.WorkerId == workerId && ws.DayOfWeek == dayOfWeek && ws.IsWorking);
 
-            // If worker doesn't work on this day, return empty list
+            var workerSchedule = await context.WorkerSchedules
+                .FirstOrDefaultAsync(ws =>
+                    ws.WorkerId == workerId &&
+                    ws.DayOfWeek == dayOfWeek &&
+                    ws.IsWorking);
+
             if (workerSchedule == null)
             {
-                _logger.LogInformation("Worker {WorkerId} is not working on {DayOfWeek}", workerId, date.DayOfWeek);
+                logger.LogInformation(
+                    "Worker {WorkerId} is not working on {DayOfWeek}",
+                    workerId,
+                    date.DayOfWeek);
+
                 return new List<TimeOnly>();
             }
 
-            // Get slot duration from config (default 60 minutes)
-            var slotDurationConfig = await _context.BusinessConfigs.FirstOrDefaultAsync(c => c.ConfigKey == "slot_duration_minutes");
-            int slotDuration = int.Parse(slotDurationConfig?.ConfigValue ?? "60");
+            var slotDurationConfig = await context.BusinessConfigs
+                .FirstOrDefaultAsync(c => c.ConfigKey == "slot_duration_minutes");
 
-            // Generate all possible time slots based on worker's schedule
+            int slotDuration = int.TryParse(slotDurationConfig?.ConfigValue, out var parsed)
+                ? parsed
+                : 60;
+
             var allSlots = new List<TimeOnly>();
             var currentTime = workerSchedule.StartTime;
             var endTime = workerSchedule.EndTime;
@@ -97,31 +130,79 @@ namespace WhatsAppBookingService.Services
                 currentTime = currentTime.AddMinutes(slotDuration);
             }
 
-            // Get booked appointments for this worker on this date
-            var bookedTimes = await _context.Appointments
-                .Where(a => a.WorkerId == workerId && a.AppointmentDate == date && a.Status != "cancelled")
+            var bookedTimes = await context.Appointments
+                .Where(a =>
+                    a.WorkerId == workerId &&
+                    a.AppointmentDate == date &&
+                    a.Status != "cancelled")
                 .Select(a => a.AppointmentTime)
                 .ToListAsync();
 
-            // Return only available slots
-            return allSlots.Where(slot => !bookedTimes.Contains(slot)).ToList();
+            var availableSlots = allSlots
+                .Where(slot => !bookedTimes.Contains(slot))
+                .ToList();
+
+            var nowInTurkey = GetTurkeyTime();
+            var todayInTurkey = DateOnly.FromDateTime(nowInTurkey);
+
+            if (date == todayInTurkey)
+            {
+                var currentTimeInTurkey = TimeOnly.FromDateTime(nowInTurkey);
+
+                int remainder = currentTimeInTurkey.Minute % slotDuration;
+                if (remainder != 0)
+                {
+                    currentTimeInTurkey =
+                        currentTimeInTurkey.AddMinutes(slotDuration - remainder);
+                }
+
+                availableSlots = availableSlots
+                    .Where(slot => slot >= currentTimeInTurkey)
+                    .ToList();
+
+                logger.LogInformation(
+                    "Filtering past slots. WorkerId={WorkerId}, Date={Date}, Now={Now}, AvailableCount={Count}",
+                    workerId,
+                    date,
+                    currentTimeInTurkey,
+                    availableSlots.Count);
+            }
+
+            return availableSlots
+                .OrderBy(t => t)
+                .ToList();
         }
 
         #endregion
 
         #region Appointment Methods
 
-        public async Task<Appointment?> CreateAppointmentAsync(int userId, int workerId, DateOnly date, TimeOnly time, string? serviceType)
+        public async Task<Appointment?> CreateAppointmentAsync(int userId, int workerId, DateOnly date, TimeOnly time,
+            string? serviceType)
         {
             try
             {
-                // Check if slot is still available for this worker
-                var existingAppointment = await _context.Appointments
-                    .FirstOrDefaultAsync(a => a.WorkerId == workerId && a.AppointmentDate == date && a.AppointmentTime == time && a.Status != "cancelled");
+                var nowInTurkey = GetTurkeyTime();
+                var todayInTurkey = DateOnly.FromDateTime(nowInTurkey);
+                var currentTimeInTurkey = TimeOnly.FromDateTime(nowInTurkey);
+
+                if (date < todayInTurkey || (date == todayInTurkey && time <= currentTimeInTurkey))
+                {
+                    logger.LogWarning(
+                        "Rejected past appointment. UserId={UserId} WorkerId={WorkerId} RequestedDate={Date} RequestedTime={Time} TurkeyNow={Now}",
+                        userId, workerId, date, time, nowInTurkey);
+                    return null;
+                }
+
+                var existingAppointment = await context.Appointments
+                    .FirstOrDefaultAsync(a =>
+                        a.WorkerId == workerId && a.AppointmentDate == date && a.AppointmentTime == time &&
+                        a.Status != "cancelled");
 
                 if (existingAppointment != null)
                 {
-                    _logger.LogWarning("Time slot already booked for worker {WorkerId}: {Date} {Time}", workerId, date, time);
+                    logger.LogWarning("Time slot already booked for worker {WorkerId}: {Date} {Time}", workerId, date,
+                        time);
                     return null;
                 }
 
@@ -137,15 +218,17 @@ namespace WhatsAppBookingService.Services
                     UpdatedAt = DateTime.UtcNow
                 };
 
-                _context.Appointments.Add(appointment);
-                await _context.SaveChangesAsync();
+                context.Appointments.Add(appointment);
+                await context.SaveChangesAsync();
 
-                _logger.LogInformation("Created appointment for user {UserId} with worker {WorkerId} on {Date} at {Time}", userId, workerId, date, time);
+                logger.LogInformation(
+                    "Created appointment for user {UserId} with worker {WorkerId} on {Date} at {Time}", userId,
+                    workerId, date, time);
                 return appointment;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to create appointment for user {UserId}", userId);
+                logger.LogError(ex, "Failed to create appointment for user {UserId}", userId);
                 return null;
             }
         }
@@ -154,32 +237,34 @@ namespace WhatsAppBookingService.Services
         {
             try
             {
-                var appointment = await _context.Appointments
+                var appointment = await context.Appointments
                     .FirstOrDefaultAsync(a => a.Id == appointmentId && a.UserId == userId);
 
                 if (appointment == null)
                 {
-                    _logger.LogWarning("Appointment not found: {AppointmentId} for user {UserId}", appointmentId, userId);
+                    logger.LogWarning("Appointment not found: {AppointmentId} for user {UserId}", appointmentId,
+                        userId);
                     return false;
                 }
 
                 appointment.Status = "cancelled";
                 appointment.UpdatedAt = DateTime.UtcNow;
 
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Cancelled appointment {AppointmentId} for user {UserId}", appointmentId, userId);
+                await context.SaveChangesAsync();
+                logger.LogInformation("Cancelled appointment {AppointmentId} for user {UserId}", appointmentId,
+                    userId);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to cancel appointment {AppointmentId}", appointmentId);
+                logger.LogError(ex, "Failed to cancel appointment {AppointmentId}", appointmentId);
                 return false;
             }
         }
 
         public async Task<List<Appointment>> GetUserAppointmentsAsync(int userId)
         {
-            return await _context.Appointments
+            return await context.Appointments
                 .Include(a => a.Worker)
                 .Where(a => a.UserId == userId && a.Status != "cancelled")
                 .OrderBy(a => a.AppointmentDate)
@@ -190,4 +275,3 @@ namespace WhatsAppBookingService.Services
         #endregion
     }
 }
-

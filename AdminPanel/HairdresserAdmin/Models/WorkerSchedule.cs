@@ -16,7 +16,7 @@ namespace HairdresserAdmin.Models
         [Column("day_of_week")]
         [Required]
         [Display(Name = "Gün")]
-        public int DayOfWeek { get; set; } // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+        public int DayOfWeek { get; set; }
 
         [Column("start_time")]
         [Required]
@@ -32,11 +32,9 @@ namespace HairdresserAdmin.Models
         [Display(Name = "Çalışıyor")]
         public bool IsWorking { get; set; } = true;
 
-        // Navigation property
         [ForeignKey("WorkerId")]
         public Worker Worker { get; set; } = null!;
 
-        // Helper property for display
         [NotMapped]
         public string DayName => DayOfWeek switch
         {

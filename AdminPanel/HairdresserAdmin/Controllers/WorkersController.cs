@@ -17,7 +17,6 @@ namespace HairdresserAdmin.Controllers
             _context = context;
         }
 
-        // GET: Workers
         public async Task<IActionResult> Index()
         {
             var today = DateOnly.FromDateTime(DateTime.Today);
@@ -44,7 +43,6 @@ namespace HairdresserAdmin.Controllers
             return View(workers);
         }
 
-        // GET: Workers/Create
         public IActionResult Create()
         {
             var viewModel = new WorkerViewModel
@@ -54,7 +52,6 @@ namespace HairdresserAdmin.Controllers
             return View(viewModel);
         }
 
-        // POST: Workers/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(WorkerViewModel viewModel)
@@ -72,7 +69,6 @@ namespace HairdresserAdmin.Controllers
                 _context.Workers.Add(worker);
                 await _context.SaveChangesAsync();
 
-                // Add schedules
                 foreach (var schedule in viewModel.Schedules.Where(s => s.IsWorking))
                 {
                     var workerSchedule = new WorkerSchedule
@@ -96,7 +92,6 @@ namespace HairdresserAdmin.Controllers
             return View(viewModel);
         }
 
-        // GET: Workers/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -125,7 +120,6 @@ namespace HairdresserAdmin.Controllers
             return View(viewModel);
         }
 
-        // POST: Workers/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, WorkerViewModel viewModel)
@@ -150,10 +144,8 @@ namespace HairdresserAdmin.Controllers
                 worker.Specialty = viewModel.Specialty;
                 worker.IsActive = viewModel.IsActive;
 
-                // Remove existing schedules
                 _context.WorkerSchedules.RemoveRange(worker.Schedules);
 
-                // Add new schedules
                 foreach (var schedule in viewModel.Schedules.Where(s => s.IsWorking))
                 {
                     var workerSchedule = new WorkerSchedule
@@ -176,7 +168,6 @@ namespace HairdresserAdmin.Controllers
             return View(viewModel);
         }
 
-        // GET: Workers/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -196,7 +187,6 @@ namespace HairdresserAdmin.Controllers
             return View(worker);
         }
 
-        // POST: Workers/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
@@ -213,7 +203,6 @@ namespace HairdresserAdmin.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Toggle active status
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleActive(int id)
@@ -231,7 +220,6 @@ namespace HairdresserAdmin.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Helper methods
         private List<WorkerScheduleViewModel> GetDefaultSchedules()
         {
             var schedules = new List<WorkerScheduleViewModel>();
@@ -243,7 +231,7 @@ namespace HairdresserAdmin.Controllers
                 {
                     DayOfWeek = i,
                     DayName = dayNames[i],
-                    IsWorking = i >= 1 && i <= 6, // Monday to Saturday by default
+                    IsWorking = i >= 1 && i <= 6,
                     StartTime = new TimeOnly(9, 0),
                     EndTime = new TimeOnly(18, 0)
                 });

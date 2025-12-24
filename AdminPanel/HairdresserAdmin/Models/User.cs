@@ -25,7 +25,6 @@ namespace HairdresserAdmin.Models
         [Column("last_contact")]
         public DateTime LastContact { get; set; }
 
-        // Navigation property
         public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
     }
 }

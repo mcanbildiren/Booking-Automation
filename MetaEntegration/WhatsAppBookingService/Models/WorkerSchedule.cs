@@ -15,7 +15,7 @@ namespace WhatsAppBookingService.Models
 
         [Column("day_of_week")]
         [Required]
-        public int DayOfWeek { get; set; } // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+        public int DayOfWeek { get; set; }
 
         [Column("start_time")]
         [Required]
@@ -28,7 +28,6 @@ namespace WhatsAppBookingService.Models
         [Column("is_working")]
         public bool IsWorking { get; set; } = true;
 
-        // Navigation property
         [ForeignKey("WorkerId")]
         public Worker Worker { get; set; } = null!;
     }

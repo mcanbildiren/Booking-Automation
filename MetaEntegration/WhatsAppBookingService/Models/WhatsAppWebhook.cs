@@ -2,7 +2,6 @@ using System.Text.Json.Serialization;
 
 namespace WhatsAppBookingService.Models
 {
-    // Models for WhatsApp Cloud API Webhook
     public class WhatsAppWebhookPayload
     {
         [JsonPropertyName("object")]

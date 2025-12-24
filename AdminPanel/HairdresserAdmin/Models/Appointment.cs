@@ -45,7 +45,6 @@ namespace HairdresserAdmin.Models
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; }
 
-        // Navigation properties
         [ForeignKey("UserId")]
         public User User { get; set; } = null!;
 

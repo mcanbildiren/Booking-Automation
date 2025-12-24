@@ -7,6 +7,11 @@
     var nextYear = Model.CurrentMonth == 12 ? Model.CurrentYear + 1 : Model.CurrentYear;
 }
 
+<!-- Used by JS POST actions (UpdateStatus/UpdateNotes) to pick up an antiforgery token -->
+<form method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+
 <div class="row mb-4">
     <div class="col-md-12">
         <div class="d-flex justify-content-between align-items-center">

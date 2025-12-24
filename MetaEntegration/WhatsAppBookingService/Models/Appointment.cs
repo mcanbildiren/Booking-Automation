@@ -45,7 +45,6 @@ namespace WhatsAppBookingService.Models
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation properties
         [ForeignKey("UserId")]
         public User User { get; set; } = null!;
 

@@ -26,13 +26,10 @@ namespace WhatsAppBookingService.Services
         {
             _logger.LogInformation("Processing message from {From}: {Message}", from, messageText);
 
-            // Get or create user
             var user = await _bookingService.GetOrCreateUserAsync(from, senderName);
 
-            // Get conversation state
             var state = await _conversationService.GetStateAsync(from);
 
-            // Handle commands
             if (messageText.Trim().ToLower().StartsWith("/randevu") || messageText.Trim().ToLower() == "randevu")
             {
                 await StartBookingFlowAsync(from);
@@ -51,14 +48,12 @@ namespace WhatsAppBookingService.Services
                 return;
             }
 
-            // Handle conversation flow
             if (state != null)
             {
                 await ProcessConversationStepAsync(from, messageText, state, user.Id);
             }
             else
             {
-                // Welcome message
                 await SendWelcomeMessageAsync(from);
             }
         }
@@ -76,7 +71,6 @@ namespace WhatsAppBookingService.Services
                 return;
             }
 
-            // Handle based on reply ID pattern
             if (replyId.StartsWith("worker_"))
             {
                 await HandleWorkerSelectionAsync(from, replyId, state);
@@ -139,7 +133,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
 
         private async Task StartBookingFlowAsync(string from)
         {
-            // STEP 1: Show available workers
             var workers = await _bookingService.GetActiveWorkersAsync();
 
             if (workers.Count == 0)
@@ -172,7 +165,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
 
         private async Task HandleWorkerSelectionAsync(string from, string replyId, ConversationState state)
         {
-            // Extract worker ID from replyId (format: worker_123)
             var workerIdString = replyId.Replace("worker_", "");
             if (!int.TryParse(workerIdString, out var workerId))
             {
@@ -187,15 +179,13 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
                 return;
             }
 
-            // Update state with selected worker
             state.SelectedWorkerId = workerId;
             state.SelectedWorkerName = worker.Name;
             state.CurrentStep = ConversationStep.AwaitingDate;
             await _conversationService.UpdateStateAsync(state);
 
-            // STEP 2: Show available dates for next 7 days
             var availableDates = new List<(string id, string title, string? description)>();
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(3));
 
             for (int i = 0; i < 7; i++)
             {
@@ -220,7 +210,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
 
         private async Task HandleDateSelectionAsync(string from, string replyId, ConversationState state, int userId)
         {
-            // Extract date from replyId (format: date_yyyy-MM-dd)
             var dateString = replyId.Replace("date_", "");
             if (!DateOnly.TryParse(dateString, out var selectedDate))
             {
@@ -228,7 +217,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
                 return;
             }
 
-            // Make sure we have a worker selected
             if (!state.SelectedWorkerId.HasValue)
             {
                 await _whatsAppService.SendTextMessageAsync(from, "❌ Lütfen önce bir çalışan seçin. /randevu");
@@ -240,7 +228,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
             state.CurrentStep = ConversationStep.AwaitingTime;
             await _conversationService.UpdateStateAsync(state);
 
-            // STEP 3: Get available time slots for this worker on this date
             var availableSlots = await _bookingService.GetAvailableTimeSlotsForWorkerAsync(state.SelectedWorkerId.Value, selectedDate);
 
             if (availableSlots.Count == 0)
@@ -267,7 +254,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
 
         private async Task HandleTimeSelectionAsync(string from, string replyId, ConversationState state, int userId)
         {
-            // Extract time from replyId (format: time_HH:mm)
             var timeString = replyId.Replace("time_", "");
             if (!TimeOnly.TryParse(timeString, out var selectedTime))
             {
@@ -279,7 +265,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
             state.CurrentStep = ConversationStep.ConfirmingAppointment;
             await _conversationService.UpdateStateAsync(state);
 
-            // STEP 4: Show confirmation with all details
             var formattedDate = state.SelectedDate!.Value.ToString("dd MMMM yyyy", new CultureInfo("tr-TR"));
             var formattedTime = selectedTime.ToString("HH:mm");
 
@@ -303,7 +288,6 @@ Herhangi bir sorunuz varsa bizimle iletişime geçebilirsiniz!";
                 return;
             }
 
-            // Create appointment with worker
             var appointment = await _bookingService.CreateAppointmentAsync(
                 userId,
                 state.SelectedWorkerId.Value,
@@ -363,7 +347,6 @@ Görüşmek üzere! 👋";
 
         private async Task HandleAppointmentCancellationAsync(string from, string replyId, int userId)
         {
-            // Extract appointment ID from replyId (format: cancel_123)
             var appointmentIdString = replyId.Replace("cancel_", "");
             if (!int.TryParse(appointmentIdString, out var appointmentId))
             {
@@ -385,7 +368,6 @@ Görüşmek üzere! 👋";
 
         private async Task ProcessConversationStepAsync(string from, string messageText, ConversationState state, int userId)
         {
-            // If user sends a message while in a flow, guide them
             await _whatsAppService.SendTextMessageAsync(from, "Lütfen yukarıdaki seçeneklerden birini seçin veya /randevu yazarak yeni bir randevu oluşturun.");
         }
     }

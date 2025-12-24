@@ -19,7 +19,7 @@ namespace WhatsAppBookingService.Models
     public enum ConversationStep
     {
         Initial,
-        AwaitingWorker,      // NEW: Select a worker first
+        AwaitingWorker,
         AwaitingDate,
         AwaitingTime,
         AwaitingServiceType,

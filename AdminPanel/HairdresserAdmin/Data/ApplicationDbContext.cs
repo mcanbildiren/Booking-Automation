@@ -19,7 +19,6 @@ namespace HairdresserAdmin.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Configure User entity
             modelBuilder.Entity<User>(entity =>
             {
                 entity.ToTable("users");
@@ -29,7 +28,6 @@ namespace HairdresserAdmin.Data
                 entity.Property(e => e.LastContact).HasDefaultValueSql("NOW()");
             });
 
-            // Configure Worker entity
             modelBuilder.Entity<Worker>(entity =>
             {
                 entity.ToTable("workers");
@@ -39,7 +37,6 @@ namespace HairdresserAdmin.Data
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
             });
 
-            // Configure WorkerSchedule entity
             modelBuilder.Entity<WorkerSchedule>(entity =>
             {
                 entity.ToTable("worker_schedules");
@@ -53,7 +50,6 @@ namespace HairdresserAdmin.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Configure Appointment entity
             modelBuilder.Entity<Appointment>(entity =>
             {
                 entity.ToTable("appointments");
@@ -64,7 +60,6 @@ namespace HairdresserAdmin.Data
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("NOW()");
 
-                // Configure relationships
                 entity.HasOne(a => a.User)
                     .WithMany(u => u.Appointments)
                     .HasForeignKey(a => a.UserId)

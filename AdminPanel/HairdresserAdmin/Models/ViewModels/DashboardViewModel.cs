@@ -8,14 +8,12 @@ namespace HairdresserAdmin.Models.ViewModels
         public int ConfirmedAppointments { get; set; }
         public int PendingAppointments { get; set; }
         public int CancelledAppointments { get; set; }
-        
-        // Calendar data
+
         public List<CalendarDayViewModel> CalendarDays { get; set; } = new();
         public int CurrentMonth { get; set; }
         public int CurrentYear { get; set; }
         public string MonthName { get; set; } = string.Empty;
-        
-        // Workers for filtering
+
         public List<WorkerFilterViewModel> Workers { get; set; } = new();
         public int? SelectedWorkerId { get; set; }
     }
@@ -30,8 +28,7 @@ namespace HairdresserAdmin.Models.ViewModels
         public string? ServiceType { get; set; }
         public string? Notes { get; set; }
         public int DurationMinutes { get; set; }
-        
-        // Worker info
+
         public int WorkerId { get; set; }
         public string WorkerName { get; set; } = string.Empty;
 

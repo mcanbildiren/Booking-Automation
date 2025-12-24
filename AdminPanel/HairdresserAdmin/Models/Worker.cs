@@ -29,7 +29,6 @@ namespace HairdresserAdmin.Models
         [Display(Name = "Oluşturulma Tarihi")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation properties
         public ICollection<WorkerSchedule> Schedules { get; set; } = new List<WorkerSchedule>();
         public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
     }

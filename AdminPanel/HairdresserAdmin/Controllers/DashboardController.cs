@@ -19,7 +19,6 @@ namespace HairdresserAdmin.Controllers
 
         public async Task<IActionResult> Index(string? date, int? workerId, int? month, int? year)
         {
-            // Determine selected date
             DateOnly selectedDate;
             if (!string.IsNullOrEmpty(date) && DateOnly.TryParse(date, out var parsedDate))
             {
@@ -30,17 +29,14 @@ namespace HairdresserAdmin.Controllers
                 selectedDate = DateOnly.FromDateTime(DateTime.Today);
             }
 
-            // Determine calendar month/year
             int calendarMonth = month ?? selectedDate.Month;
             int calendarYear = year ?? selectedDate.Year;
 
-            // Build query for appointments
             var query = _context.Appointments
                 .Include(a => a.User)
                 .Include(a => a.Worker)
                 .Where(a => a.AppointmentDate == selectedDate);
 
-            // Filter by worker if specified
             if (workerId.HasValue && workerId.Value > 0)
             {
                 query = query.Where(a => a.WorkerId == workerId.Value);
@@ -63,7 +59,6 @@ namespace HairdresserAdmin.Controllers
                 })
                 .ToListAsync();
 
-            // Get workers for filter dropdown
             var workers = await _context.Workers
                 .Where(w => w.IsActive)
                 .OrderBy(w => w.Name)
@@ -74,14 +69,11 @@ namespace HairdresserAdmin.Controllers
                 })
                 .ToListAsync();
 
-            // Build calendar data - AWAIT IMMEDIATELY to avoid DbContext concurrency issues
             var calendarDays = await BuildCalendarDays(calendarYear, calendarMonth, selectedDate, workerId);
 
-            // Get month name in Turkish
             var culture = new CultureInfo("tr-TR");
             var monthName = culture.DateTimeFormat.GetMonthName(calendarMonth);
 
-            // Calculate monthly statistics
             var firstDayOfMonth = new DateOnly(calendarYear, calendarMonth, 1);
             var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
             
@@ -130,9 +122,8 @@ namespace HairdresserAdmin.Controllers
             var firstDayOfMonth = new DateOnly(year, month, 1);
             var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
 
-            // Get appointment counts for the month
-            var startDate = firstDayOfMonth.AddDays(-(int)firstDayOfMonth.DayOfWeek + 1); // Start from Monday
-            var endDate = lastDayOfMonth.AddDays(7 - (int)lastDayOfMonth.DayOfWeek); // End at Sunday
+            var startDate = firstDayOfMonth.AddDays(-(int)firstDayOfMonth.DayOfWeek + 1);
+            var endDate = lastDayOfMonth.AddDays(7 - (int)lastDayOfMonth.DayOfWeek);
 
             var query = _context.Appointments
                 .Where(a => a.AppointmentDate >= startDate && a.AppointmentDate <= endDate && a.Status != "cancelled");
@@ -147,9 +138,8 @@ namespace HairdresserAdmin.Controllers
                 .Select(g => new { Date = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.Date, x => x.Count);
 
-            // Build 6 weeks of calendar
             var currentDate = startDate;
-            if ((int)firstDayOfMonth.DayOfWeek == 0) // If month starts on Sunday
+            if ((int)firstDayOfMonth.DayOfWeek == 0)
             {
                 currentDate = firstDayOfMonth.AddDays(-6);
             }
@@ -158,7 +148,7 @@ namespace HairdresserAdmin.Controllers
                 currentDate = firstDayOfMonth.AddDays(-((int)firstDayOfMonth.DayOfWeek - 1));
             }
 
-            for (int i = 0; i < 42; i++) // 6 weeks
+            for (int i = 0; i < 42; i++)
             {
                 days.Add(new CalendarDayViewModel
                 {
@@ -224,7 +214,6 @@ namespace HairdresserAdmin.Controllers
             return View(appointment);
         }
 
-        // Return partial view for day appointments
         [HttpGet]
         public async Task<IActionResult> GetDayAppointmentsPartial(string date, int? workerId)
         {
@@ -232,6 +221,9 @@ namespace HairdresserAdmin.Controllers
             {
                 return BadRequest();
             }
+
+            ViewData["SelectedDate"] = selectedDate.ToString("yyyy-MM-dd");
+            ViewData["SelectedWorkerId"] = workerId;
 
             var query = _context.Appointments
                 .Include(a => a.User)
