@@ -1,0 +1,68 @@
+2025-12-25 10:08:48.622 +03:00 [ERR] Failed executing DbCommand (11ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2025-12-25 10:08:48.778 +03:00 [INF] Database migrations applied successfully
+2025-12-25 10:08:48.806 +03:00 [INF] Booking System (Admin + WhatsApp) starting...
+2025-12-25 10:08:48.819 +03:00 [WRN] No XML encryptor configured. Key {82f6969e-2b3f-4a97-9742-e3fe39f1032d} may be persisted to storage in unencrypted form.
+2025-12-25 10:10:34.885 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-12-25 10:10:56.798 +03:00 [INF] User admin authenticated successfully
+2025-12-25 13:52:53.947 +03:00 [INF] Database migrations applied successfully
+2025-12-25 13:52:54.148 +03:00 [INF] Booking System (Admin + WhatsApp) starting...
+2025-12-25 13:59:17.047 +03:00 [INF] Database migrations applied successfully
+2025-12-25 13:59:17.149 +03:00 [INF] Booking System (Admin + WhatsApp) starting...
+2025-12-25 13:59:17.885 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-12-25 14:06:22.995 +03:00 [INF] Database migrations applied successfully
+2025-12-25 14:06:23.090 +03:00 [INF] Booking System (Admin + WhatsApp) starting...
+2025-12-25 14:06:23.665 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-12-25 14:06:40.049 +03:00 [INF] Received webhook payload
+2025-12-25 14:06:42.019 +03:00 [INF] Processing message from 905358239931: /randevu
+2025-12-25 14:06:42.179 +03:00 [INF] Created new user: 905358239931
+2025-12-25 14:06:43.026 +03:00 [INF] Successfully sent WhatsApp message to 905358239931
+2025-12-25 14:06:43.869 +03:00 [INF] Received webhook payload
+2025-12-25 14:06:43.869 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSMDdEQjBBMzU5QTA4RUFBMDIwAA== - sent
+2025-12-25 14:06:44.824 +03:00 [INF] Received webhook payload
+2025-12-25 14:06:44.824 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSMDdEQjBBMzU5QTA4RUFBMDIwAA== - delivered
+2025-12-25 14:07:10.384 +03:00 [INF] Created worker: 1 - Can
+2025-12-25 14:07:27.923 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:28.384 +03:00 [INF] Processing message from 905358239931: /randevu
+2025-12-25 14:07:28.403 +03:00 [INF] Updated conversation state for 905358239931 to step "AwaitingWorker"
+2025-12-25 14:07:29.501 +03:00 [INF] Successfully sent interactive list to 905358239931
+2025-12-25 14:07:30.466 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:30.466 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSM0VERUY4RDA4MjUxQ0U5N0NGAA== - sent
+2025-12-25 14:07:31.367 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:31.367 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSM0VERUY4RDA4MjUxQ0U5N0NGAA== - delivered
+2025-12-25 14:07:34.639 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:35.091 +03:00 [INF] Processing interactive reply from 905358239931: worker_1
+2025-12-25 14:07:35.158 +03:00 [INF] Updated conversation state for 905358239931 to step "AwaitingDate"
+2025-12-25 14:07:35.850 +03:00 [INF] Successfully sent interactive list to 905358239931
+2025-12-25 14:07:36.786 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:36.787 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSOTRFNkJFMTNEMzkzOTdBMEU4AA== - sent
+2025-12-25 14:07:37.532 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:37.533 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSOTRFNkJFMTNEMzkzOTdBMEU4AA== - delivered
+2025-12-25 14:07:42.623 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:43.122 +03:00 [INF] Processing interactive reply from 905358239931: date_2025-12-25
+2025-12-25 14:07:43.140 +03:00 [INF] Updated conversation state for 905358239931 to step "AwaitingTime"
+2025-12-25 14:07:43.183 +03:00 [INF] Filtering past slots. WorkerId=1, Date="2025-12-25", Now="15:00:43.1829540", AvailableCount=2
+2025-12-25 14:07:43.809 +03:00 [INF] Successfully sent interactive list to 905358239931
+2025-12-25 14:07:44.594 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:44.594 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSMUZGQzQ1RERBRjEwNjdFQURBAA== - sent
+2025-12-25 14:07:45.482 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:45.482 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSMUZGQzQ1RERBRjEwNjdFQURBAA== - delivered
+2025-12-25 14:07:53.766 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:54.272 +03:00 [INF] Processing interactive reply from 905358239931: time_16:00
+2025-12-25 14:07:54.290 +03:00 [INF] Updated conversation state for 905358239931 to step "ConfirmingAppointment"
+2025-12-25 14:07:55.001 +03:00 [INF] Successfully sent interactive buttons to 905358239931
+2025-12-25 14:07:55.867 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:55.867 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSRDg3MEQzODg0QjY5RDQwODdDAA== - sent
+2025-12-25 14:07:56.659 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:56.659 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSRDg3MEQzODg0QjY5RDQwODdDAA== - delivered
+2025-12-25 14:07:57.885 +03:00 [INF] Received webhook payload
+2025-12-25 14:07:58.383 +03:00 [INF] Processing interactive reply from 905358239931: confirm_yes
+2025-12-25 14:07:58.441 +03:00 [INF] Created appointment for user 1 with worker 1 on "2025-12-25" at "16:00:00.0000000"
+2025-12-25 14:07:59.199 +03:00 [INF] Successfully sent WhatsApp message to 905358239931
+2025-12-25 14:07:59.200 +03:00 [INF] Cleared conversation state for 905358239931
+2025-12-25 14:08:00.030 +03:00 [INF] Received webhook payload
+2025-12-25 14:08:00.031 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSMEYxRjkyNUQ5M0M5RUI1NDA3AA== - sent
+2025-12-25 14:08:01.187 +03:00 [INF] Received webhook payload
+2025-12-25 14:08:01.187 +03:00 [INF] Message status update: wamid.HBgMOTA1MzU4MjM5OTMxFQIAERgSMEYxRjkyNUQ5M0M5RUI1NDA3AA== - delivered
